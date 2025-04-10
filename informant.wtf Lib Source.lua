@@ -1,11 +1,3 @@
---[[
-Octohook ui lib informant version
-Developed by liam#4567
-Edited by xz#1111
-]]
-
--- // Load
-
 local startupArgs = ({...})[1] or {}
 
 if getgenv().library ~= nil then
@@ -896,7 +888,7 @@ function library:init()
         local i = 0
         for v in next, self.notifications do
             utility:Tween(v.holder, 'Position', newUDim2(0,0,0, 75 + (i * 30)), .15)
-            i += 1
+            i = i + 1
         end
     end
 
@@ -1737,7 +1729,7 @@ function library:init()
                                     
                                     if currentList.multi then
                                         for i,v in next, currentSelected do
-                                            if v == "none" then continue end
+                                           -- if v == "none" then continue end
                                             newSelected[i] = v;
                                         end
                                         if table.find(newSelected, val) then
@@ -1998,7 +1990,7 @@ function library:init()
                         option.objects.holder.Visible = option.enabled
                         if option.enabled then
                             option.objects.holder.Position = newUDim2(0,0,0,ySize-15);
-                            ySize += option.objects.holder.Object.Size.Y + padding;
+                            ySize = ySize + option.objects.holder.Object.Size.Y + padding;
                         end
                     end
 
@@ -4426,7 +4418,7 @@ function library:init()
 
                 objs.topBorder.ThemeColor = v.selected and 'Accent' or 'Unselected Tab Background';
 
-                pos += objs.background.Size.X.Offset + 1
+                pos = pos + objs.background.Size.X.Offset + 1
 
                 v:UpdateSections();
 
