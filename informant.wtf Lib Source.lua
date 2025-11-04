@@ -4707,24 +4707,32 @@ function library:CreateSettingsTab(menu)
     
     creditsSection:AddSeparator({text = 'Owners/Developers'});
     creditsSection:AddText({text = "zikiouh"})
-
     configSection:AddBox({text = 'Config Name', flag = 'configinput'})
-    configSection:AddList({text = 'Config', flag = 'selectedconfig'})
-
+    
+    local configList = configSection:AddList({text = 'Config', flag = 'selectedconfig', callback = function(configName)
+        local autoloadConfig = library:GetAutoloadConfig()
+        if library.options.config_autoload then
+            library.options.config_autoload:SetState(configName == autoloadConfig, true)
+        end
+    end})
+    
     local function refreshConfigs()
-        library.options.selectedconfig:ClearValues();
+        configList:ClearValues();
         for name in next, library:GetAllConfigs() do
-            library.options.selectedconfig:AddValue(name)
+            configList:AddValue(name)
+        end
+        
+        local autoloadConfig = library:GetAutoloadConfig()
+        if autoloadConfig and library.options.config_autoload then
+            library.options.config_autoload:SetState(library.flags.selectedconfig == autoloadConfig, true)
         end
     end
-
-    local autoloadCheckbox
+    
     configSection:AddButton({text = 'Load', confirm = false, callback = function()
         library:LoadConfig(library.flags.selectedconfig);
     end}):AddButton({text = 'Save', confirm = true, callback = function()
         library:SaveConfig(library.flags.selectedconfig);
     end})
-
     configSection:AddButton({text = 'Create', confirm = false, callback = function()
         if library.flags.configinput == "" then 
             return
@@ -4741,7 +4749,7 @@ function library:CreateSettingsTab(menu)
         end
     end})
     
-    autoloadCheckbox = configSection:AddToggle({
+    local autoloadCheckbox = configSection:AddToggle({
         text = 'Set as Autoload',
         flag = 'config_autoload',
         callback = function(bool)
@@ -4751,9 +4759,7 @@ function library:CreateSettingsTab(menu)
             end
         end
     })
-
     refreshConfigs()
-
     themeSection:AddBox({text = 'Theme Name', flag = 'themeinput'})
     
     local themeList = themeSection:AddList({text = 'Theme', flag = 'selectedtheme', callback = function(themeName)
@@ -4843,11 +4849,9 @@ function library:CreateSettingsTab(menu)
         
         colorIndex = colorIndex + 1
     end
-
     mainSection:AddBind({text = 'Open / Close', flag = 'togglebind', nomouse = true, noindicator = true, bind = Enum.KeyCode.RightShift, callback = function()
         library:SetOpen(not library.open)
     end});
-
     mainSection:AddToggle({text = 'Disable Movement If Open', flag = 'disablemenumovement', callback = function(bool)
         if bool and library.open then
             actionservice:BindAction(
@@ -4862,7 +4866,6 @@ function library:CreateSettingsTab(menu)
             actionservice:UnbindAction('FreezeMovement');
         end
     end})
-
     mainSection:AddButton({text = 'Join Discord', flag = 'joindiscord', confirm = true, callback = function()
         local res = syn.request({
             Url = 'http://127.0.0.1:6463/rpc?v=1',
@@ -4882,19 +4885,15 @@ function library:CreateSettingsTab(menu)
     mainSection:AddButton({text = 'Copy Discord', flag = 'copydiscord', callback = function()
         setclipboard('https://discord.gg/'..getgenv().Config.Invite)
     end})
-
     mainSection:AddButton({text = 'Rejoin Server', confirm = true, callback = function()
         game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, game.JobId);
     end})
-
     mainSection:AddButton({text = 'Copy Join Script', callback = function()
         setclipboard(([[game:GetService("TeleportService"):TeleportToPlaceInstance(%s, "%s")]]):format(game.PlaceId, game.JobId))
     end})
-
     mainSection:AddButton({text = 'Unload', confirm = true, callback = function()
         library:Unload();
     end})
-
     mainSection:AddSeparator({text = 'Keybinds'});
     mainSection:AddToggle({text = 'Keybind Indicator', flag = 'keybind_indicator', callback = function(bool)
         library.keyIndicator:SetEnabled(bool);
@@ -4905,7 +4904,6 @@ function library:CreateSettingsTab(menu)
     mainSection:AddSlider({text = 'Position Y', flag = 'keybind_indicator_y', min = 0, max = 100, increment = .1, value = 35, callback = function()
         library.keyIndicator:SetPosition(newUDim2(library.flags.keybind_indicator_x / 100, 0, library.flags.keybind_indicator_y / 100, 0));    
     end});
-
     mainSection:AddSeparator({text = 'Watermark'})
     mainSection:AddToggle({text = 'Enabled', flag = 'watermark_enabled'});
     mainSection:AddList({text = 'Position', flag = 'watermark_pos', selected = 'Custom', values = {'Top', 'Top Left', 'Top Right', 'Bottom Left', 'Bottom Right', 'Custom'}, callback = function(val)
@@ -4913,10 +4911,8 @@ function library:CreateSettingsTab(menu)
     end})
     mainSection:AddSlider({text = 'Custom X', flag = 'watermark_x', suffix = '%', value = 6.1, min = 0, max = 100, increment = .1});
     mainSection:AddSlider({text = 'Custom Y', flag = 'watermark_y', suffix = '%', value = 1.2, min = 0, max = 100, increment = .1});
-
     return settingsTab;
 end
 
 getgenv().library = library
 return library
-
