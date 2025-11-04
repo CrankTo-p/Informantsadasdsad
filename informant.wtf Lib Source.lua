@@ -4697,14 +4697,16 @@ end
 
 function library:CreateSettingsTab(menu)
     local settingsTab = menu:AddTab('Settings', 999);
+    local settingsTab2 = menu:AddTab('Settings Extended', 999);
     local configSection = settingsTab:AddSection('Config', 2);
     local themeSection = settingsTab:AddSection('Theme', 2);
     local mainSection = settingsTab:AddSection('Main', 1);
-    local themeCustomSection = settingsTab:AddSection('Theme Editor', 1);
+    local themeCustomSection = settingsTab2:AddSection('Theme Editor', 1);
     local creditsSection = settingsTab:AddSection('Credits', 2);
     
     creditsSection:AddSeparator({text = 'Owners/Developers'});
     creditsSection:AddText({text = "zikiouh"})
+
     configSection:AddBox({text = 'Config Name', flag = 'configinput'})
     configSection:AddList({text = 'Config', flag = 'selectedconfig'})
 
