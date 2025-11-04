@@ -12,7 +12,6 @@ local function gs(a)
     return game:GetService(a)
 end
 
--- // Variables
 local players, http, runservice, inputservice, tweenService, stats, actionservice = gs('Players'), gs('HttpService'), gs('RunService'), gs('UserInputService'), gs('TweenService'), gs('Stats'), gs('ContextActionService')
 local localplayer = players.LocalPlayer
 
@@ -65,6 +64,7 @@ local library = {
     cheatname = startupArgs.cheatname or 'octohook';
     gamename = startupArgs.gamename or 'universal';
     fileext = startupArgs.fileext or '.txt';
+    themeext = '.json';
 }
 
 library.themes = {
@@ -401,26 +401,24 @@ do
         }
 
         function drawing:Update()
-            -- if drawing.Parent then
-                local parent = drawing.Parent ~= nil and library.drawings[drawing.Parent.Object] or nil
-                local parentSize,parentPos,parentVis = workspace.CurrentCamera.ViewportSize, Vector2.new(0,0), true;
-                if parent ~= nil then
-                    parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and parent.Object.Size or parent.Class == 'Text' and parent.TextBounds or workspace.CurrentCamera.ViewportSize
-                    parentPos = parent.Object.Position
-                    parentVis = parent.Object.Visible
-                end
+            local parent = drawing.Parent ~= nil and library.drawings[drawing.Parent.Object] or nil
+            local parentSize,parentPos,parentVis = workspace.CurrentCamera.ViewportSize, Vector2.new(0,0), true;
+            if parent ~= nil then
+                parentSize = (parent.Class == 'Square' or parent.Class == 'Image') and parent.Object.Size or parent.Class == 'Text' and parent.TextBounds or workspace.CurrentCamera.ViewportSize
+                parentPos = parent.Object.Position
+                parentVis = parent.Object.Visible
+            end
 
-                if drawing.Class == 'Square' or drawing.Class == 'Image' then
-                    drawing.Object.Size = typeof(drawing.Size) == 'Vector2' and drawing.Size or typeof(drawing.Size) == 'UDim2' and utility:UDim2ToVector2(drawing.Size,parentSize)
-                end
+            if drawing.Class == 'Square' or drawing.Class == 'Image' then
+                drawing.Object.Size = typeof(drawing.Size) == 'Vector2' and drawing.Size or typeof(drawing.Size) == 'UDim2' and utility:UDim2ToVector2(drawing.Size,parentSize)
+            end
 
-                if drawing.Class == 'Square' or drawing.Class == 'Image' or drawing.Class == 'Circle' or drawing.Class == 'Text' then
-                    drawing.Object.Position = parentPos + (typeof(drawing.Position) == 'Vector2' and drawing.Position or utility:UDim2ToVector2(drawing.Position,parentSize))
-                end
+            if drawing.Class == 'Square' or drawing.Class == 'Image' or drawing.Class == 'Circle' or drawing.Class == 'Text' then
+                drawing.Object.Position = parentPos + (typeof(drawing.Position) == 'Vector2' and drawing.Position or utility:UDim2ToVector2(drawing.Position,parentSize))
+            end
 
-                drawing.Object.Visible = (parentVis and drawing.Visible) and true or false
+            drawing.Object.Visible = (parentVis and drawing.Visible) and true or false
 
-            -- end
             drawing:UpdateChildren()
         end
 
@@ -444,7 +442,6 @@ do
 
         library.drawings[drawing.Object] = drawing
 
-        -- this is really stupid lol
         local proxy = utility:DetectTableChange(
         function(obj,i)
             return drawing[i] == nil and drawing.Object[i] or drawing[i]
@@ -549,6 +546,7 @@ function library:init()
     makefolder(self.cheatname..'/assets')
     makefolder(self.cheatname..'/'..self.gamename)
     makefolder(self.cheatname..'/'..self.gamename..'/configs');
+    makefolder(self.cheatname..'/themes');
 
     function self:SetTheme(theme)
         for i,v in next, theme do
@@ -566,28 +564,38 @@ function library:init()
     function self:LoadConfig(name)
         local cfg = self:GetConfig(name)
         if not cfg then
-
             return
         end
 
         local s,e = pcall(function()
             setByConfig = true
-            for flag,value in next, http:JSONDecode(cfg) do
-                local option = library.options[flag]
-                if option ~= nil then
-                    if option.class == 'toggle' then
-                        option:SetState(value == nil and false or (value == 1 and true or false));
-                    elseif option.class == 'slider' then
-                        option:SetValue(value == nil and 0 or value)
-                    elseif option.class == 'bind' then
-                        option:SetBind(value == nil and 'none' or (utility:HasProperty(Enum.KeyCode, value) and Enum.KeyCode[value] or Enum.UserInputType[value]));
-                    elseif option.class == 'color' then
-                        option:SetColor(value == nil and c3new(1,1,1) or c3new(value[1], value[2], value[3]));
-                        option:SetTrans(value == nil and 1 or value[4]);
-                    elseif option.class == 'list' then
-                        option:Select(value == nil and '' or value);
-                    elseif option.class == 'box' then
-                        option:SetInput(value == nil and '' or value)
+            local decoded = http:JSONDecode(cfg)
+            
+            if decoded._theme then
+                local themeData = self:GetTheme(decoded._theme)
+                if themeData then
+                    self:SetTheme(themeData)
+                end
+            end
+            
+            for flag,value in next, decoded do
+                if flag ~= "_theme" and flag ~= "_autoload" then
+                    local option = library.options[flag]
+                    if option ~= nil then
+                        if option.class == 'toggle' then
+                            option:SetState(value == nil and false or (value == 1 and true or false));
+                        elseif option.class == 'slider' then
+                            option:SetValue(value == nil and 0 or value)
+                        elseif option.class == 'bind' then
+                            option:SetBind(value == nil and 'none' or (utility:HasProperty(Enum.KeyCode, value) and Enum.KeyCode[value] or Enum.UserInputType[value]));
+                        elseif option.class == 'color' then
+                            option:SetColor(value == nil and c3new(1,1,1) or c3new(value[1], value[2], value[3]));
+                            option:SetTrans(value == nil and 1 or value[4]);
+                        elseif option.class == 'list' then
+                            option:Select(value == nil and '' or value);
+                        elseif option.class == 'box' then
+                            option:SetInput(value == nil and '' or value)
+                        end
                     end
                 end
             end
@@ -603,6 +611,10 @@ function library:init()
 
         local s,e = pcall(function()
             local cfg = {};
+            
+            cfg._theme = library.flags.current_theme or "Default"
+            cfg._autoload = false
+            
             for flag,option in next, self.options do
                 if option.class == 'toggle' then
                     cfg[flag] = option.state and 1 or 0;
@@ -625,6 +637,142 @@ function library:init()
             end
             writefile(self.cheatname..'/'..self.gamename..'/configs/'..name..self.fileext, http:JSONEncode(cfg));
         end)
+    end
+    
+    function self:SetAutoloadConfig(name)
+        if not self:GetConfig(name) then
+            return
+        end
+        
+        local cfg = http:JSONDecode(self:GetConfig(name))
+        
+        for configName in next, self:GetAllConfigs() do
+            local tempCfg = self:GetConfig(configName)
+            if tempCfg then
+                local decoded = http:JSONDecode(tempCfg)
+                decoded._autoload = (configName == name)
+                writefile(self.cheatname..'/'..self.gamename..'/configs/'..configName..self.fileext, http:JSONEncode(decoded))
+            end
+        end
+    end
+    
+    function self:GetAutoloadConfig()
+        for configName in next, self:GetAllConfigs() do
+            local cfg = self:GetConfig(configName)
+            if cfg then
+                local decoded = http:JSONDecode(cfg)
+                if decoded._autoload then
+                    return configName
+                end
+            end
+        end
+        return nil
+    end
+    
+    function self:GetAllConfigs()
+        local configs = {}
+        for _,v in next, listfiles(self.cheatname..'/'..self.gamename..'/configs') do
+            local ext = '.'..v:split('.')[#v:split('.')];
+            if ext == self.fileext then
+                local name = v:split('\\')[#v:split('\\')]:sub(1,-#ext-1)
+                configs[name] = true
+            end
+        end
+        return configs
+    end
+    
+    function self:SaveTheme(name, themeData)
+        local themeToSave = themeData or self.theme
+        local themeTable = {}
+        for colorName, color in next, themeToSave do
+            themeTable[colorName] = {color.R, color.G, color.B}
+        end
+        writefile(self.cheatname..'/themes/'..name..self.themeext, http:JSONEncode(themeTable))
+    end
+    
+    function self:GetTheme(name)
+        if isfile(self.cheatname..'/themes/'..name..self.themeext) then
+            local themeData = http:JSONDecode(readfile(self.cheatname..'/themes/'..name..self.themeext))
+            local theme = {}
+            for colorName, rgb in next, themeData do
+                theme[colorName] = fromrgb(rgb[1] * 255, rgb[2] * 255, rgb[3] * 255)
+            end
+            return theme
+        end
+        
+        for _,preset in next, self.themes do
+            if preset.name == name then
+                return preset.theme
+            end
+        end
+        
+        return nil
+    end
+    
+    function self:LoadTheme(name)
+        local theme = self:GetTheme(name)
+        if theme then
+            self:SetTheme(theme)
+            library.flags.current_theme = name
+        end
+    end
+function self:GetAllThemes()
+        local themes = {}
+        
+        for _,preset in next, self.themes do
+            themes[preset.name] = true
+        end
+        
+        for _,v in next, listfiles(self.cheatname..'/themes') do
+            local ext = '.'..v:split('.')[#v:split('.')];
+            if ext == self.themeext then
+                local name = v:split('\\')[#v:split('\\')]:sub(1,-#ext-1)
+                themes[name] = true
+            end
+        end
+        return themes
+    end
+    
+    function self:DeleteTheme(name)
+        if isfile(self.cheatname..'/themes/'..name..self.themeext) then
+            delfile(self.cheatname..'/themes/'..name..self.themeext)
+        end
+    end
+    
+    function self:ExportTheme(name)
+        local theme = self:GetTheme(name)
+        if theme then
+            local themeTable = {}
+            for colorName, color in next, theme do
+                themeTable[colorName] = {color.R, color.G, color.B}
+            end
+            setclipboard(http:JSONEncode(themeTable))
+            return true
+        end
+        return false
+    end
+    
+    function self:ImportTheme(name, data)
+        local s,e = pcall(function()
+            local themeData = http:JSONDecode(data)
+            local theme = {}
+            for colorName, rgb in next, themeData do
+                theme[colorName] = fromrgb(rgb[1] * 255, rgb[2] * 255, rgb[3] * 255)
+            end
+            self:SaveTheme(name, theme)
+        end)
+        return s
+    end
+    
+    function self:SetAutoloadTheme(name)
+        writefile(self.cheatname..'/autoload_theme.txt', name)
+    end
+    
+    function self:GetAutoloadTheme()
+        if isfile(self.cheatname..'/autoload_theme.txt') then
+            return readfile(self.cheatname..'/autoload_theme.txt')
+        end
+        return "Default"
     end
 
     for i,v in next, self.images do
@@ -672,7 +820,6 @@ function library:init()
                         hoverObjData.MouseButton1Down:Fire(inputservice:GetMouseLocation())
                     end
 
-                    -- // Update Sliders Click
                     if library.draggingSlider ~= nil then
                         local rel = inputservice:GetMouseLocation() - library.draggingSlider.objects.background.Object.Position;
                         local val = utility:ConvertNumberRange(rel.X, 0 , library.draggingSlider.objects.background.Object.Size.X, library.draggingSlider.min, library.draggingSlider.max);
@@ -732,7 +879,6 @@ function library:init()
 
                 if mb1down then
 
-                    -- // Update Sliders Drag
                     if library.draggingSlider ~= nil then
                         local rel = inputservice:GetMouseLocation() - library.draggingSlider.objects.background.Object.Position;
                         local val = utility:ConvertNumberRange(rel.X, 0 , library.draggingSlider.objects.background.Object.Size.X, library.draggingSlider.min, library.draggingSlider.max);
@@ -904,7 +1050,6 @@ function library:init()
 
         table.insert(self.indicators, indicator)
 
-        -- Create Objects --
         do
             local z = self.zindexOrder.indicator;
             local objs = indicator.objects;
@@ -952,7 +1097,6 @@ function library:init()
             });
 
         end
-        --------------------
 
         function indicator:Update()
             local xSize  = 125
@@ -993,7 +1137,6 @@ function library:init()
 
             table.insert(self.values, value);
 
-            -- Create Objects --
             do
                 local z = library.zindexOrder.indicator;
                 local objs = value.objects;
@@ -1042,7 +1185,6 @@ function library:init()
                 });
 
             end
-            --------------------
 
             function value:Remove()
                 table.remove(indicator.values, table.find(indicator.values, value))
@@ -1132,7 +1274,6 @@ function library:init()
 
         table.insert(library.windows, window);
 
-        ----- Create Objects ----
         do
             local size = data.size or newUDim2(0, 525, 0, 650);
             local position = data.position or newUDim2(0, 250, 0, 150);
@@ -1283,509 +1424,496 @@ function library:init()
             end)
 
         end
-        -------------------------
 
-        -- Create Color Picker --
         do
-            -- Objects
-            do
-                local objs = window.colorpicker.objects;
-                local z = library.zindexOrder.colorpicker;
+            local objs = window.colorpicker.objects;
+            local z = library.zindexOrder.colorpicker;
 
-                objs.background = utility:Draw('Square', {
-                    Visible = false;
-                    Size = newUDim2(0,200,0,242);
-                    Position = newUDim2(1,-200,1,10);
-                    ThemeColor = 'Background';
-                    ZIndex = z;
-                    Parent = window.objects.background;
-                })
+            objs.background = utility:Draw('Square', {
+                Visible = false;
+                Size = newUDim2(0,200,0,242);
+                Position = newUDim2(1,-200,1,10);
+                ThemeColor = 'Background';
+                ZIndex = z;
+                Parent = window.objects.background;
+            })
 
-                objs.border1 = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    ThemeColor = 'Border';
-                    ZIndex = z-1;
-                    Parent = objs.background;
-                })
+            objs.border1 = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                ThemeColor = 'Border';
+                ZIndex = z-1;
+                Parent = objs.background;
+            })
 
-                objs.border2 = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    ThemeColor = 'Border 1';
-                    ZIndex = z-2;
-                    Parent = objs.border1;
-                })
+            objs.border2 = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                ThemeColor = 'Border 1';
+                ZIndex = z-2;
+                Parent = objs.border1;
+            })
 
-                objs.border3 = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    ThemeColor = 'Border';
-                    ZIndex = z-3;
-                    Parent = objs.border2;
-                })
+            objs.border3 = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                ThemeColor = 'Border';
+                ZIndex = z-3;
+                Parent = objs.border2;
+            })
 
-                objs.statusText = utility:Draw('Text', {
-                    Position = newUDim2(0,5,0,4);
-                    Text = 'colorpicker_status_text';
-                    ThemeColor = 'Option Text 1';
-                    Size = 13;
-                    Font = 2;
-                    Outline = true;
-                    ZIndex = z+1;
-                    Parent = objs.background;
-                })
+            objs.statusText = utility:Draw('Text', {
+                Position = newUDim2(0,5,0,4);
+                Text = 'colorpicker_status_text';
+                ThemeColor = 'Option Text 1';
+                Size = 13;
+                Font = 2;
+                Outline = true;
+                ZIndex = z+1;
+                Parent = objs.background;
+            })
 
-                objs.mainColor = utility:Draw('Square', {
-                    Size = newUDim2(0, 175, 0, 175);
-                    Position = newUDim2(0, 5, 0, 25);
-                    Color = c3new(1,0,0);
-                    ZIndex = z+2;
-                    Parent = objs.background;
-                })
+            objs.mainColor = utility:Draw('Square', {
+                Size = newUDim2(0, 175, 0, 175);
+                Position = newUDim2(0, 5, 0, 25);
+                Color = c3new(1,0,0);
+                ZIndex = z+2;
+                Parent = objs.background;
+            })
 
-                objs.sat1 = utility:Draw('Image', {
-                    Size = newUDim2(1,0,1,0);
-                    Data = crypt.base64decode("iVBORw0KGgoAAAANSUhEUgAAAaQAAAGkCAQAAADURZm+AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JQAAgIMAAPn/AACA6QAAdTAAAOpgAAA6mAAAF2+SX8VGAAAAAmJLR0QA/4ePzL8AAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQflBwwSLzK3wl3KAAADrElEQVR42u3TORLCMBBFwT+6/50hMqXSZgonBN0BWCDGYPwqeSWVZPWYVHd0Pc5H86v9areu4Sz9u7XZXT/vvtZtu6dtJtYw525iGya05afnWW17ltPE8fzfTZy/yf3vmCes59xf0Sf/42l3lnvGOyyH+y/bo/X689wCPCYkEBIICYQECAmEBEICIQFCAiGBkEBIgJBASCAkEBIgJBASCAmEBAgJhARCAiEBQgIhgZAAIYGQQEggJEBIICQQEggJEBIICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIICRASCAmEBAgJhARCAiEBQgIhgZBASICQQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQQEguAQgJhARCAoQEQgIhgZAAIYGQQEggJEBIICQQEggJEBIICYQEQgKEBEICIYGQACGBkEBIgJBASCAkEBIgJBASCAmEBAgJhARCAiEBQgIhgZBASICQQEggJBASICQQEggJhAQICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIICRASCAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQQEiAkEBIICQQEiAkEBIICYQECAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASCAkQEggJhARCAoQEQgIhgZAAIYGQQEggJEBIICQQEiAkEBIICYQECAmEBEICIQFCAiGBkEBIgJBASCAkEBIgJBASCAmEBAgJhARCAiEBQgIhgZAAIYGQQEggJEBIICQQEggJEBIICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIgJBASCAmEBAgJhARCAiEBQgIhgZBASICQQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQACGBkEBIICRASCAkEBIICRASCAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASCAkQEggJhAQICYQEQgIhAUICIYGQQEiAkEBIICQQEiAkEBIICYQECAmEBEICIQFCAiGBkEBILgEICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIICRASCAmEBEIChARCAiGBkAAhgZBASICQQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQQEiAkEBIICQQEiAkEBIICYQECAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASCAkQEggJhARCAoQEQgIhgZAAIYGQQEggJEBIICQQEiAkEBL8lzft9AVFFzN+ywAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0wNy0xMlQxODo0Nzo1MCswMDowMIxlM90AAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMDctMTJUMTg6NDc6NTArMDA6MDD9OIthAAAAAElFTkSuQmCC");
-                    ZIndex = z+3;
-                    Parent = objs.mainColor;
-                })
+            objs.sat1 = utility:Draw('Image', {
+                Size = newUDim2(1,0,1,0);
+                Data = crypt.base64decode("iVBORw0KGgoAAAANSUhEUgAAAaQAAAGkCAQAAADURZm+AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JQAAgIMAAPn/AACA6QAAdTAAAOpgAAA6mAAAF2+SX8VGAAAAAmJLR0QA/4ePzL8AAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQflBwwSLzK3wl3KAAADrElEQVR42u3TORLCMBBFwT+6/50hMqXSZgonBN0BWCDGYPwqeSWVZPWYVHd0Pc5H86v9areu4Sz9u7XZXT/vvtZtu6dtJtYw525iGya05afnWW17ltPE8fzfTZy/yf3vmCes59xf0Sf/42l3lnvGOyyH+y/bo/X689wCPCYkEBIICYQECAmEBEICIQFCAiGBkEBIgJBASCAkEBIgJBASCAmEBAgJhARCAiEBQgIhgZAAIYGQQEggJEBIICQQEggJEBIICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIICRASCAmEBAgJhARCAiEBQgIhgZBASICQQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQQEguAQgJhARCAoQEQgIhgZAAIYGQQEggJEBIICQQEggJEBIICYQEQgKEBEICIYGQACGBkEBIgJBASCAkEBIgJBASCAmEBAgJhARCAiEBQgIhgZBASICQQEggJBASICQQEggJhAQICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIICRASCAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQQEiAkEBIICQQEiAkEBIICYQECAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASCAkQEggJhARCAoQEQgIhgZAAIYGQQEggJEBIICQQEiAkEBIICYQECAmEBEICIQFCAiGBkEBIgJBASCAkEBIgJBASCAmEBAgJhARCAiEBQgIhgZAAIYGQQEggJEBIICQQEggJEBIICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIgJBASCAmEBAgJhARCAiEBQgIhgZBASICQQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQACGBkEBIICRASCAkEBIICRASCAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASCAkQEggJhAQICYQEQgIhAUICIYGQQEiAkEBIICQQEiAkEBIICYQECAmEBEICIQFCAiGBkEBILgEICYQEQgKEBEICIYGQACGBkEBIICRASCAkEBIICRASCAmEBEIChARCAiGBkAAhgZBASICQQEggJBASICQQEggJhAQICYQEQgIhAUICIYGQQEiAkEBIICQQEiAkEBIICYQECAmEBEIChARCAiGBkAAhgZBASCAkQEggJBASCAkQEggJhARCAoQEQgIhgZAAIYGQQEggJEBIICQQEiAkEBL8lzft9AVFFzN+ywAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0wNy0xMlQxODo0Nzo1MCswMDowMIxlM90AAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMDctMTJUMTg6NDc6NTArMDA6MDD9OIthAAAAAElFTkSuQmCC");
+                ZIndex = z+3;
+                Parent = objs.mainColor;
+            })
 
-                objs.sat2 = utility:Draw('Image', {
-                    Size = newUDim2(1,0,1,0);
-                    Data = crypt.base64decode("iVBORw0KGgoAAAANSUhEUgAAAaQAAAGkCAQAAADURZm+AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JQAAgIMAAPn/AACA6QAAdTAAAOpgAAA6mAAAF2+SX8VGAAAAAmJLR0QA/4ePzL8AAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQflBwwSLyBEeyyCAAAD4klEQVR42u3YwQnAQAhFQTek/5pz9eBtEYzMlBD4PDcRADDBieMjwK3HJwBDghFepx0oEhgSOO0ARQJDAqcdKBJgSGBI4I0EhgQ47cCQwJDAGwlQJDAkcNqBIgGKBIoEhgROO0CRQJFAkQBDAqcdGBI47QBFAkUCQwKnHaBIoEigSKBIgCKBIYHTDhQJUCQwJHDagSIBigSGBE47UCRAkcCQwGkHKBIoEigSGBLgtANDAkMCbyTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBIoEqBIYEjgtANFUiRQJFAkMCTAaQeKBIoEigQYEjjtQJFAkQBFAkMCpx0oEmBI4LQDRQJFAhQJDAmcdqBIgCKBIoEhAU47UCRQJFAkwJDAaQeKBIYEOO1AkUCRYHuRTAmcduC0A0UCFAkUCQwJnHaAIoEigSKBIQFOO2gvkimBIoE3EhgS4LQDRQJDAqcdoEigSKBIYEiAIYEhwXx+NoAigSGB0w5QJDAkMCQwJKDiZwMoEhgSOO0ARQJFgnlFMiVw2oHTDhQJUCRQJDAkcNoBVZFMCRQJvJHAkACnHSgSKBIoElANSZPAaQdOOzAkwGkHigSGBIYEGBK08LMBFAkUCRQJMCQwJDAkWMjPBlAkMCRw2gG5SKYEigTeSGBIgNMOFAkMCQwJMCRo4WcDKBIYEjjtgFwkUwJFAm8kMCTAaQeKBIoEigRUQ9IkcNqB0w4MCXDagSKBIsHCIpkSOO3AaQeKBCgSKBIYEhgSYEjQws8GUCQwJHDaAblIpgSKBN5IYEiA0w4UCQwJDAkwJGjhZwMoEhgSOO0ARQJDAkMCQwIqfjaAIoEigSIBhgROO5hXJFMCpx047UCRAEUCRQJDAqcdUBXJlECRwBsJDAlw2oEigSKBIgGGBIYEhgSL+dkAigSGBE47QJHAkMBpB4oEGBIYEhgSrOZnAygSKBIoEmBI4LQDRQJFAhQJDAmcdrC8SKYEigTeSGBIgNMOFAkMCZx2gCKBIoEigSEBTjtQJFAkUCTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBKgSKBIYEjgtAMUCRQJFAkMCXDagSKBIoEiAYYETjtQJFAkQJHAkMBpB4oEGBI47UCRQJEARQJDAqcdoEigSGBI4LQDFAkUCRQJFAkwJHDagSKBIQFOOzAkMCTwRgIMCZx2oEigSIAigSKBIYHTzkcARQJFAkMCnHZgSGBI4I0EGBI47UCRQJEAQwKnHSgSKBKgSGBI4LQDRQIUCRQJDAmcdoAigSGB0w5QJFAkUCQwJMBpB4oEhgROO0CRwJDAkMAbCVAkMCT4gw/reQYigE05fAAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0wNy0xMlQxODo0NzozMiswMDowMN2VK3MAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMDctMTJUMTg6NDc6MzIrMDA6MDCsyJPPAAAAAElFTkSuQmCC");
-                    ZIndex = z+4;
-                    Parent = objs.mainColor;
-                })
+            objs.sat2 = utility:Draw('Image', {
+                Size = newUDim2(1,0,1,0);
+                Data = crypt.base64decode("iVBORw0KGgoAAAANSUhEUgAAAaQAAAGkCAQAAADURZm+AAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JQAAgIMAAPn/AACA6QAAdTAAAOpgAAA6mAAAF2+SX8VGAAAAAmJLR0QA/4ePzL8AAAAJcEhZcwAACxMAAAsTAQCanBgAAAAHdElNRQflBwwSLyBEeyyCAAAD4klEQVR42u3YwQnAQAhFQTek/5pz9eBtEYzMlBD4PDcRADDBieMjwK3HJwBDghFepx0oEhgSOO0ARQJDAqcdKBJgSGBI4I0EhgQ47cCQwJDAGwlQJDAkcNqBIgGKBIoEhgROO0CRQJFAkQBDAqcdGBI47QBFAkUCQwKnHaBIoEigSKBIgCKBIYHTDhQJUCQwJHDagSIBigSGBE47UCRAkcCQwGkHKBIoEigSGBLgtANDAkMCbyTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBIoEqBIYEjgtANFUiRQJFAkMCTAaQeKBIoEigQYEjjtQJFAkQBFAkMCpx0oEmBI4LQDRQJFAhQJDAmcdqBIgCKBIoEhAU47UCRQJFAkwJDAaQeKBIYEOO1AkUCRYHuRTAmcduC0A0UCFAkUCQwJnHaAIoEigSKBIQFOO2gvkimBIoE3EhgS4LQDRQJDAqcdoEigSKBIYEiAIYEhwXx+NoAigSGB0w5QJDAkMCQwJKDiZwMoEhgSOO0ARQJFgnlFMiVw2oHTDhQJUCRQJDAkcNoBVZFMCRQJvJHAkACnHSgSKBIoElANSZPAaQdOOzAkwGkHigSGBIYEGBK08LMBFAkUCRQJMCQwJDAkWMjPBlAkMCRw2gG5SKYEigTeSGBIgNMOFAkMCQwJMCRo4WcDKBIYEjjtgFwkUwJFAm8kMCTAaQeKBIoEigRUQ9IkcNqB0w4MCXDagSKBIsHCIpkSOO3AaQeKBCgSKBIYEhgSYEjQws8GUCQwJHDaAblIpgSKBN5IYEiA0w4UCQwJDAkwJGjhZwMoEhgSOO0ARQJDAkMCQwIqfjaAIoEigSIBhgROO5hXJFMCpx047UCRAEUCRQJDAqcdUBXJlECRwBsJDAlw2oEigSKBIgGGBIYEhgSL+dkAigSGBE47QJHAkMBpB4oEGBIYEhgSrOZnAygSKBIoEmBI4LQDRQJFAhQJDAmcdrC8SKYEigTeSGBIgNMOFAkMCZx2gCKBIoEigSEBTjtQJFAkUCTAkMBpB4oEigQoEhgSOO1AkQBDAqcdKBKgSKBIYEjgtAMUCRQJFAkMCXDagSKBIoEiAYYETjtQJFAkQJHAkMBpB4oEGBI47UCRQJEARQJDAqcdoEigSGBI4LQDFAkUCRQJFAkwJHDagSKBIQFOOzAkMCTwRgIMCZx2oEigSIAigSKBIYHTzkcARQJFAkMCnHZgSGBI4I0EGBI47UCRQJEAQwKnHSgSKBKgSGBI4LQDRQIUCRQJDAmcdoAigSGB0w5QJFAkUCQwJMBpB4oEhgROO0CRwJDAkMAbCVAkMCT4gw/reQYigE05fAAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0wNy0xMlQxODo0NzozMiswMDowMN2VK3MAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMDctMTJUMTg6NDc6MzIrMDA6MDCsyJPPAAAAAElFTkSuQmCC");
+                ZIndex = z+4;
+                Parent = objs.mainColor;
+            })
 
-                objs.colorBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    ThemeColor = 'Border';
-                    ZIndex = z+1;
-                    Parent = objs.mainColor;
-                })
+            objs.colorBorder = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                ThemeColor = 'Border';
+                ZIndex = z+1;
+                Parent = objs.mainColor;
+            })
 
-                objs.mainDetector = utility:Draw('Square',{
-                    Size = newUDim2(1,0,1,0);
-                    Transparency = 0;
-                    ZIndex = z+10;
-                    Parent = objs.mainColor;
-                })
+            objs.mainDetector = utility:Draw('Square',{
+                Size = newUDim2(1,0,1,0);
+                Transparency = 0;
+                ZIndex = z+10;
+                Parent = objs.mainColor;
+            })
 
-                objs.hue = utility:Draw('Image', {
-                    Size = newUDim2(0,175,0,10);
-                    Position = newUDim2(0,5,0,205);
-                    Data = library.images.colorhue;
-                    ZIndex = z+2;
-                    Parent = objs.background;
-                })
+            objs.hue = utility:Draw('Image', {
+                Size = newUDim2(0,175,0,10);
+                Position = newUDim2(0,5,0,205);
+                Data = library.images.colorhue;
+                ZIndex = z+2;
+                Parent = objs.background;
+            })
 
-                objs.hueBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    ThemeColor = 'Border';
-                    ZIndex = z+1;
-                    Parent = objs.hue;
-                })
+            objs.hueBorder = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                ThemeColor = 'Border';
+                ZIndex = z+1;
+                Parent = objs.hue;
+            })
 
-                objs.hueDetector = utility:Draw('Square',{
-                    Size = newUDim2(1,0,1,0);
-                    Transparency = 0;
-                    ZIndex = z+10;
-                    Parent = objs.hue;
-                })
+            objs.hueDetector = utility:Draw('Square',{
+                Size = newUDim2(1,0,1,0);
+                Transparency = 0;
+                ZIndex = z+10;
+                Parent = objs.hue;
+            })
 
-                objs.transColor = utility:Draw('Square', {
-                    Size = newUDim2(0,10,0,175);
-                    Position = newUDim2(0,185,0,25);
-                    Color = c3new(1,0,0);
-                    ZIndex = z+2;
-                    Parent = objs.background;
-                })
+            objs.transColor = utility:Draw('Square', {
+                Size = newUDim2(0,10,0,175);
+                Position = newUDim2(0,185,0,25);
+                Color = c3new(1,0,0);
+                ZIndex = z+2;
+                Parent = objs.background;
+            })
 
-                objs.trans = utility:Draw('Image', {
-                    Size = newUDim2(1,0,1,0);
-                    Data = library.images.colortrans;
-                    ZIndex = z+3;
-                    Parent = objs.transColor;
-                })
+            objs.trans = utility:Draw('Image', {
+                Size = newUDim2(1,0,1,0);
+                Data = library.images.colortrans;
+                ZIndex = z+3;
+                Parent = objs.transColor;
+            })
 
-                objs.transBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    ThemeColor = 'Border';
-                    ZIndex = z+1;
-                    Parent = objs.transColor;
-                })
+            objs.transBorder = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                ThemeColor = 'Border';
+                ZIndex = z+1;
+                Parent = objs.transColor;
+            })
 
-                objs.transDetector = utility:Draw('Square',{
-                    Size = newUDim2(1,0,1,0);
-                    Transparency = 0;
-                    ZIndex = z+10;
-                    Parent = objs.transColor;
-                })
+            objs.transDetector = utility:Draw('Square',{
+                Size = newUDim2(1,0,1,0);
+                Transparency = 0;
+                ZIndex = z+10;
+                Parent = objs.transColor;
+            })
 
-                objs.pointer = utility:Draw('Square', {
-                    Size = newUDim2(0,2,0,2);
-                    Position = newUDim2(0,0,0,0);
-                    Color = c3new(1,1,1);
-                    ZIndex = z+6;
-                    Parent = objs.mainColor;
-                })
+            objs.pointer = utility:Draw('Square', {
+                Size = newUDim2(0,2,0,2);
+                Position = newUDim2(0,0,0,0);
+                Color = c3new(1,1,1);
+                ZIndex = z+6;
+                Parent = objs.mainColor;
+            })
 
-                objs.pointerBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
-                    ZIndex = z+5;
-                    Parent = objs.pointer;
-                })
+            objs.pointerBorder = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                Color = c3new(0,0,0);
+                ZIndex = z+5;
+                Parent = objs.pointer;
+            })
 
-                objs.hueSlider = utility:Draw('Square', {
-                    Size = newUDim2(0,1,1,0);
-                    Color = c3new(1,1,1);
-                    ZIndex = z+4;
-                    Parent = objs.hue;
-                })
+            objs.hueSlider = utility:Draw('Square', {
+                Size = newUDim2(0,1,1,0);
+                Color = c3new(1,1,1);
+                ZIndex = z+4;
+                Parent = objs.hue;
+            })
 
-                objs.hueSliderBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
-                    ZIndex = z+3;
-                    Parent = objs.hueSlider;
-                })
+            objs.hueSliderBorder = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                Color = c3new(0,0,0);
+                ZIndex = z+3;
+                Parent = objs.hueSlider;
+            })
 
-                objs.transSlider = utility:Draw('Square', {
-                    Size = newUDim2(1,0,0,1);
-                    Color = c3new(1,1,1);
-                    ZIndex = z+5;
-                    Parent = objs.trans;
-                })
+            objs.transSlider = utility:Draw('Square', {
+                Size = newUDim2(1,0,0,1);
+                Color = c3new(1,1,1);
+                ZIndex = z+5;
+                Parent = objs.trans;
+            })
 
-                objs.transSliderBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
-                    ZIndex = z+4;
-                    Parent = objs.transSlider;
-                })
+            objs.transSliderBorder = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                Color = c3new(0,0,0);
+                ZIndex = z+4;
+                Parent = objs.transSlider;
+            })
 
-                objs.rBackground = utility:Draw('Square', {
-                    Size = newUDim2(0, 60, 0, 15);
-                    Position = newUDim2(0, 5, 1, - 20);
-                    ThemeColor = 'Option Background';
-                    Parent = objs.background;
-                    ZIndex = z+5;
-                })
+            objs.rBackground = utility:Draw('Square', {
+                Size = newUDim2(0, 60, 0, 15);
+                Position = newUDim2(0, 5, 1, - 20);
+                ThemeColor = 'Option Background';
+                Parent = objs.background;
+                ZIndex = z+5;
+            })
 
-                objs.rBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
-                    ZIndex = z+4;
-                    Parent = objs.rBackground;
-                })
+            objs.rBorder = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                Color = c3new(0,0,0);
+                ZIndex = z+4;
+                Parent = objs.rBackground;
+            })
 
-                objs.rText = utility:Draw('Text', {
-                    Position = newUDim2(.5,0,0,0);
-                    Color = c3new(1,.1,.1);
-                    Text = 'R';
-                    Size = 13;
-                    Font = 2;
-                    Outline = true;
-                    Center = true;
-                    ZIndex = z+6;
-                    Parent = objs.rBackground;
-                })
+            objs.rText = utility:Draw('Text', {
+                Position = newUDim2(.5,0,0,0);
+                Color = c3new(1,.1,.1);
+                Text = 'R';
+                Size = 13;
+                Font = 2;
+                Outline = true;
+                Center = true;
+                ZIndex = z+6;
+                Parent = objs.rBackground;
+            })
 
-                objs.gBackground = utility:Draw('Square', {
-                    Size = newUDim2(0, 60, 0, 15);
-                    Position = newUDim2(0, 70, 1, - 20);
-                    ThemeColor = 'Option Background';
-                    Parent = objs.background;
-                    ZIndex = z+5;
-                })
+            objs.gBackground = utility:Draw('Square', {
+                Size = newUDim2(0, 60, 0, 15);
+                Position = newUDim2(0, 70, 1, - 20);
+                ThemeColor = 'Option Background';
+                Parent = objs.background;
+                ZIndex = z+5;
+            })
 
-                objs.gBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
-                    ZIndex = z+4;
-                    Parent = objs.gBackground;
-                })
+            objs.gBorder = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                Color = c3new(0,0,0);
+                ZIndex = z+4;
+                Parent = objs.gBackground;
+            })
 
-                objs.gText = utility:Draw('Text', {
-                    Position = newUDim2(.5,0,0,0);
-                    Color = c3new(.1,1,.1);
-                    Text = 'G';
-                    Size = 13;
-                    Font = 2;
-                    Outline = true;
-                    Center = true;
-                    ZIndex = z+6;
-                    Parent = objs.gBackground;
-                })
+            objs.gText = utility:Draw('Text', {
+                Position = newUDim2(.5,0,0,0);
+                Color = c3new(.1,1,.1);
+                Text = 'G';
+                Size = 13;
+                Font = 2;
+                Outline = true;
+                Center = true;
+                ZIndex = z+6;
+                Parent = objs.gBackground;
+            })
 
-                objs.bBackground = utility:Draw('Square', {
-                    Size = newUDim2(0, 60, 0, 15);
-                    Position = newUDim2(0, 135, 1, - 20);
-                    ThemeColor = 'Option Background';
-                    Parent = objs.background;
-                    ZIndex = z+5;
-                })
+            objs.bBackground = utility:Draw('Square', {
+                Size = newUDim2(0, 60, 0, 15);
+                Position = newUDim2(0, 135, 1, - 20);
+                ThemeColor = 'Option Background';
+                Parent = objs.background;
+                ZIndex = z+5;
+            })
 
-                objs.bBorder = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    Color = c3new(0,0,0);
-                    ZIndex = z+4;
-                    Parent = objs.bBackground;
-                })
+            objs.bBorder = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                Color = c3new(0,0,0);
+                ZIndex = z+4;
+                Parent = objs.bBackground;
+            })
 
-                objs.bText = utility:Draw('Text', {
-                    Position = newUDim2(.5,0,0,0);
-                    Color = c3new(.1,.1,1);
-                    Text = 'B';
-                    Size = 13;
-                    Font = 2;
-                    Outline = true;
-                    Center = true;
-                    ZIndex = z+6;
-                    Parent = objs.bBackground;
-                })
+            objs.bText = utility:Draw('Text', {
+                Position = newUDim2(.5,0,0,0);
+                Color = c3new(.1,.1,1);
+                Text = 'B';
+                Size = 13;
+                Font = 2;
+                Outline = true;
+                Center = true;
+                ZIndex = z+6;
+                Parent = objs.bBackground;
+            })
 
-                local draggingHue, draggingSat, draggingTrans = false, false, false;
+            local draggingHue, draggingSat, draggingTrans = false, false, false;
 
-                local function updateSatVal(pos)
-                    if window.colorpicker.selected ~= nil then
-                        local hue, sat, val = window.colorpicker.selected.color:ToHSV()
-                        X = (objs.mainColor.Object.Position.X + objs.mainColor.Object.Size.X) - objs.mainColor.Object.Position.X
-                        Y = (objs.mainColor.Object.Position.Y + objs.mainColor.Object.Size.Y) - objs.mainColor.Object.Position.Y
-                        X = math.clamp((pos.X - objs.mainColor.Object.Position.X) / X, 0, 0.995)
-                        Y = math.clamp((pos.Y - objs.mainColor.Object.Position.Y) / Y, 0, 0.995)
-                        sat, val = 1 - X, 1 - Y;
-                        window.colorpicker.selected:SetColor(fromhsv(hue,sat,val));
-                        window.colorpicker:Visualize(fromhsv(hue, sat, val), window.colorpicker.selected.trans);
-                    end
-                end
-
-                local function updateHue(pos)
-                    if window.colorpicker.selected ~= nil then
-                        local hue, sat, val = window.colorpicker.selected.color:ToHSV()
-                        X = (objs.hue.Object.Position.X + objs.hue.Object.Size.X) - objs.hue.Object.Position.X
-                        X = math.clamp((pos.X - objs.hue.Object.Position.X) / X, 0, 0.995)
-                        hue = 1 - X
-                        window.colorpicker.selected:SetColor(fromhsv(hue,sat,val));
-                        window.colorpicker:Visualize(fromhsv(hue, sat, val), window.colorpicker.selected.trans);
-                    end
-                end
-
-                local function updateTrans(pos)
-                    if window.colorpicker.selected ~= nil then
-                        Y = (objs.trans.Object.Position.Y + objs.trans.Object.Size.Y) - objs.trans.Object.Position.Y
-                        Y = math.clamp((pos.Y - objs.transColor.Object.Position.Y) / Y, 0, 0.995)
-                        window.colorpicker.selected:SetTrans(Y);
-                        window.colorpicker:Visualize(window.colorpicker.selected.color, Y);
-                    end
-                end
-
-                utility:Connection(objs.mainDetector.MouseButton1Down, function(pos)
-                    draggingSat = true;
-                    updateSatVal(pos)
-                end)
-
-                utility:Connection(objs.hueDetector.MouseButton1Down, function(pos)
-                    draggingHue = true;
-                    updateHue(pos)
-                end)
-
-                utility:Connection(objs.transDetector.MouseButton1Down, function(pos)
-                    draggingTrans = true;
-                    updateTrans(pos)
-                end)
-
-                utility:Connection(mousemove, function(pos)
-                    if library.open then
-                        if draggingSat then
-                            updateSatVal(pos)
-                        elseif draggingHue then
-                            updateHue(pos)
-                        elseif draggingTrans then
-                            updateTrans(pos)
-                        end
-                    end
-                end)
-
-                utility:Connection(button1up, function()
-                    draggingSat = false;
-                    draggingHue = false;
-                    draggingTrans = false;
-                end)
-
-            end
-
-            function window.colorpicker:Visualize(c3, a)
-                if typeof(c3) ~= 'Color3' then return end
-                if typeof(a) ~= 'number' then return end
-                local h,s,v = c3:ToHSV();
-                h = h == 0 and 1 or h;
-                self.color = c3;
-                self.trans = a;
-                self.objects.mainColor.Color = fromhsv(h,1,1);
-                self.objects.transColor.Color = fromhsv(h,s,v);
-                self.objects.hueSlider.Position = newUDim2(1 - h, 0,0,0);
-                self.objects.transSlider.Position = newUDim2(0,0,a,0);
-                self.objects.pointer.Position = newUDim2(1 - s, 0, 1 - v, 0);
-                self.objects.statusText.Text = 'Editing : Unknown';
-                if self.selected ~= nil then
-                    local txt = 'Editing : Unknown';
-                    if self.selected.text ~= nil and self.selected.text ~= '' then
-                        txt = tostring(self.selected.text)
-                    elseif self.selected.flag ~= nil and self.selected.flag ~= '' then
-                        txt = tostring(self.selected.flag)
-                    end
-                    self.objects.statusText.Text = tostring(txt);
+            local function updateSatVal(pos)
+                if window.colorpicker.selected ~= nil then
+                    local hue, sat, val = window.colorpicker.selected.color:ToHSV()
+                    X = (objs.mainColor.Object.Position.X + objs.mainColor.Object.Size.X) - objs.mainColor.Object.Position.X
+                    Y = (objs.mainColor.Object.Position.Y + objs.mainColor.Object.Size.Y) - objs.mainColor.Object.Position.Y
+                    X = math.clamp((pos.X - objs.mainColor.Object.Position.X) / X, 0, 0.995)
+                    Y = math.clamp((pos.Y - objs.mainColor.Object.Position.Y) / Y, 0, 0.995)
+                    sat, val = 1 - X, 1 - Y;
+                    window.colorpicker.selected:SetColor(fromhsv(hue,sat,val));
+                    window.colorpicker:Visualize(fromhsv(hue, sat, val), window.colorpicker.selected.trans);
                 end
             end
-            
-            window.colorpicker:Visualize(window.colorpicker.color, window.colorpicker.trans)
+
+            local function updateHue(pos)
+                if window.colorpicker.selected ~= nil then
+                    local hue, sat, val = window.colorpicker.selected.color:ToHSV()
+                    X = (objs.hue.Object.Position.X + objs.hue.Object.Size.X) - objs.hue.Object.Position.X
+                    X = math.clamp((pos.X - objs.hue.Object.Position.X) / X, 0, 0.995)
+                    hue = 1 - X
+                    window.colorpicker.selected:SetColor(fromhsv(hue,sat,val));
+                    window.colorpicker:Visualize(fromhsv(hue, sat, val), window.colorpicker.selected.trans);
+                end
+            end
+
+            local function updateTrans(pos)
+                if window.colorpicker.selected ~= nil then
+                    Y = (objs.trans.Object.Position.Y + objs.trans.Object.Size.Y) - objs.trans.Object.Position.Y
+                    Y = math.clamp((pos.Y - objs.transColor.Object.Position.Y) / Y, 0, 0.995)
+                    window.colorpicker.selected:SetTrans(Y);
+                    window.colorpicker:Visualize(window.colorpicker.selected.color, Y);
+                end
+            end
+
+            utility:Connection(objs.mainDetector.MouseButton1Down, function(pos)
+                draggingSat = true;
+                updateSatVal(pos)
+            end)
+
+            utility:Connection(objs.hueDetector.MouseButton1Down, function(pos)
+                draggingHue = true;
+                updateHue(pos)
+            end)
+
+            utility:Connection(objs.transDetector.MouseButton1Down, function(pos)
+                draggingTrans = true;
+                updateTrans(pos)
+            end)
+
+            utility:Connection(mousemove, function(pos)
+                if library.open then
+                    if draggingSat then
+                        updateSatVal(pos)
+                    elseif draggingHue then
+                        updateHue(pos)
+                    elseif draggingTrans then
+                        updateTrans(pos)
+                    end
+                end
+            end)
+
+            utility:Connection(button1up, function()
+                draggingSat = false;
+                draggingHue = false;
+                draggingTrans = false;
+            end)
 
         end
-        -------------------------
 
-        ---- Create Dropdown ----
-        do
-            -- Default Objects
-            do
-                local objs = window.dropdown.objects;
-                local z = library.zindexOrder.dropdown;
-
-                objs.background = utility:Draw('Square', {
-                    Visible = false;
-                    Size = newUDim2(1,-3,0,50);
-                    Position = newUDim2(0,3,1,0);
-                    ThemeColor = 'Background';
-                    ZIndex = z;
-                    Parent = window.objects.background;
-                })
-
-                objs.border1 = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    ThemeColor = 'Border';
-                    ZIndex = z-1;
-                    Parent = objs.background;
-                })
-
-                objs.border2 = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    ThemeColor = 'Border 1';
-                    ZIndex = z-2;
-                    Parent = objs.border1;
-                })
-
-                objs.border3 = utility:Draw('Square', {
-                    Size = newUDim2(1,2,1,2);
-                    Position = newUDim2(0,-1,0,-1);
-                    ThemeColor = 'Border';
-                    ZIndex = z-3;
-                    Parent = objs.border2;
-                })
-
-            end
-
-            function window.dropdown:Refresh()
-                if self.selected ~= nil then
-                    local list = self.selected
-                    for idx, value in next, list.values do
-                        local valueObject = self.objects.values[idx]
-                        if valueObject == nil then
-                            valueObject = {};
-                            valueObject.background = utility:Draw('Square', {
-                                Size = newUDim2(1,-4,0,18);
-                                Color = Color3.new(.25,.25,.25);
-                                Transparency = 0;
-                                ZIndex = library.zindexOrder.dropdown+1;
-                                Parent = self.objects.background;
-                            })
-                            valueObject.text = utility:Draw('Text', {
-                                Position = newUDim2(0,3,0,1);
-                                ThemeColor = 'Option Text 2';
-                                Text = tostring(value);
-                                Size = 13;
-                                Font = 2;
-                                ZIndex = library.zindexOrder.dropdown+2;
-                                Parent = valueObject.background;
-                            })
-                            valueObject.connection = utility:Connection(valueObject.background.MouseButton1Down, function()
-                                local currentList = self.selected
-                                if currentList then
-                                    local val = currentList.values[idx]
-                                    local currentSelected = currentList.selected;
-                                    local newSelected = currentList.multi and {} or val;
-                                    
-                                    if currentList.multi then
-                                        for i,v in next, currentSelected do
-                                           -- if v == "none" then continue end
-                                            newSelected[i] = v;
-                                        end
-                                        if table.find(newSelected, val) then
-                                            table.remove(newSelected, table.find(newSelected, val));
-                                        else
-                                            table.insert(newSelected, val)
-                                        end
-                                    end
-
-                                    currentList:Select(newSelected);
-                                    if not currentList.multi then
-                                        currentList.open = false;
-                                        currentList.objects.openText.Text = '+';
-                                        window.dropdown.selected = nil;
-                                        window.dropdown.objects.background.Visible = false;
-                                    end
-
-                                    for idx, val in next, currentList.values do
-                                        local valueObj = self.objects.values[idx]
-                                        if valueObj then
-                                            valueObj.background.Transparency = (typeof(newSelected) == 'table' and table.find(newSelected, val) or newSelected == val) and 1 or 0
-                                        end
-                                    end
-
-                                end
-                            end)
-                            self.objects.values[idx] = valueObject
-                        end
-                    end
-
-                    for idx, val in next, list.values do
-                        local valueObj = self.objects.values[idx]
-                        if valueObj then
-                            valueObj.background.Transparency = (typeof(list.selected) == 'table' and table.find(list.selected, val) or list.selected == val) and 1 or 0
-                        end
-                    end
-
-                    local y,padding = 2,2
-                    for idx, obj in next, self.objects.values do
-                        local valueStr = list.values[idx]
-                        obj.background.Visible = valueStr ~= nil
-                        if valueStr ~= nil then
-                            obj.background.Position = newUDim2(0,2,0,y);
-                            obj.text.Text = valueStr;
-                            y = y + obj.background.Object.Size.Y + padding;
-                        end
-                    end
-
-                    self.objects.background.Size = newUDim2(1,-6,0,y);    
-
+        function window.colorpicker:Visualize(c3, a)
+            if typeof(c3) ~= 'Color3' then return end
+            if typeof(a) ~= 'number' then return end
+            local h,s,v = c3:ToHSV();
+            h = h == 0 and 1 or h;
+            self.color = c3;
+            self.trans = a;
+            self.objects.mainColor.Color = fromhsv(h,1,1);
+            self.objects.transColor.Color = fromhsv(h,s,v);
+            self.objects.hueSlider.Position = newUDim2(1 - h, 0,0,0);
+            self.objects.transSlider.Position = newUDim2(0,0,a,0);
+            self.objects.pointer.Position = newUDim2(1 - s, 0, 1 - v, 0);
+            self.objects.statusText.Text = 'Editing : Unknown';
+            if self.selected ~= nil then
+                local txt = 'Editing : Unknown';
+                if self.selected.text ~= nil and self.selected.text ~= '' then
+                    txt = tostring(self.selected.text)
+                elseif self.selected.flag ~= nil and self.selected.flag ~= '' then
+                    txt = tostring(self.selected.flag)
                 end
+                self.objects.statusText.Text = tostring(txt);
             end
+        end
         
-            window.dropdown:Refresh();
+        window.colorpicker:Visualize(window.colorpicker.color, window.colorpicker.trans)
+
+        do
+            local objs = window.dropdown.objects;
+            local z = library.zindexOrder.dropdown;
+
+            objs.background = utility:Draw('Square', {
+                Visible = false;
+                Size = newUDim2(1,-3,0,50);
+                Position = newUDim2(0,3,1,0);
+                ThemeColor = 'Background';
+                ZIndex = z;
+                Parent = window.objects.background;
+            })
+
+            objs.border1 = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                ThemeColor = 'Border';
+                ZIndex = z-1;
+                Parent = objs.background;
+            })
+
+            objs.border2 = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                ThemeColor = 'Border 1';
+                ZIndex = z-2;
+                Parent = objs.border1;
+            })
+
+            objs.border3 = utility:Draw('Square', {
+                Size = newUDim2(1,2,1,2);
+                Position = newUDim2(0,-1,0,-1);
+                ThemeColor = 'Border';
+                ZIndex = z-3;
+                Parent = objs.border2;
+            })
+
         end
-        -------------------------
+
+        function window.dropdown:Refresh()
+            if self.selected ~= nil then
+                local list = self.selected
+                for idx, value in next, list.values do
+                    local valueObject = self.objects.values[idx]
+                    if valueObject == nil then
+                        valueObject = {};
+                        valueObject.background = utility:Draw('Square', {
+                            Size = newUDim2(1,-4,0,18);
+                            Color = Color3.new(.25,.25,.25);
+                            Transparency = 0;
+                            ZIndex = library.zindexOrder.dropdown+1;
+                            Parent = self.objects.background;
+                        })
+                        valueObject.text = utility:Draw('Text', {
+                            Position = newUDim2(0,3,0,1);
+                            ThemeColor = 'Option Text 2';
+                            Text = tostring(value);
+                            Size = 13;
+                            Font = 2;
+                            ZIndex = library.zindexOrder.dropdown+2;
+                            Parent = valueObject.background;
+                        })
+                        valueObject.connection = utility:Connection(valueObject.background.MouseButton1Down, function()
+                            local currentList = self.selected
+                            if currentList then
+                                local val = currentList.values[idx]
+                                local currentSelected = currentList.selected;
+                                local newSelected = currentList.multi and {} or val;
+                                
+                                if currentList.multi then
+                                    for i,v in next, currentSelected do
+                                        newSelected[i] = v;
+                                    end
+                                    if table.find(newSelected, val) then
+                                        table.remove(newSelected, table.find(newSelected, val));
+                                    else
+                                        table.insert(newSelected, val)
+                                    end
+                                end
+
+                                currentList:Select(newSelected);
+                                if not currentList.multi then
+                                    currentList.open = false;
+                                    currentList.objects.openText.Text = '+';
+                                    window.dropdown.selected = nil;
+                                    window.dropdown.objects.background.Visible = false;
+                                end
+
+                                for idx, val in next, currentList.values do
+                                    local valueObj = self.objects.values[idx]
+                                    if valueObj then
+                                        valueObj.background.Transparency = (typeof(newSelected) == 'table' and table.find(newSelected, val) or newSelected == val) and 1 or 0
+                                    end
+                                end
+
+                            end
+                        end)
+                        self.objects.values[idx] = valueObject
+                    end
+                end
+
+                for idx, val in next, list.values do
+                    local valueObj = self.objects.values[idx]
+                    if valueObj then
+                        valueObj.background.Transparency = (typeof(list.selected) == 'table' and table.find(list.selected, val) or list.selected == val) and 1 or 0
+                    end
+                end
+
+                local y,padding = 2,2
+                for idx, obj in next, self.objects.values do
+                    local valueStr = list.values[idx]
+                    obj.background.Visible = valueStr ~= nil
+                    if valueStr ~= nil then
+                        obj.background.Position = newUDim2(0,2,0,y);
+                        obj.text.Text = valueStr;
+                        y = y + obj.background.Object.Size.Y + padding;
+                    end
+                end
+
+                self.objects.background.Size = newUDim2(1,-6,0,y);    
+
+            end
+        end
+    
+        window.dropdown:Refresh();
 
         local function tooltip(option)
             utility:Connection(option.objects.holder.MouseEnter, function()
@@ -1846,7 +1974,6 @@ function library:init()
 
             table.insert(self.tabs, tab);
 
-            --- Create Objects ---
             do
                 local objs = tab.objects;
                 local z = library.zindexOrder.window + 5;
@@ -1897,7 +2024,6 @@ function library:init()
                 end)
 
             end
-            ----------------------
 
             function tab:AddSection(text, side, order)
                 local section = {
@@ -1911,7 +2037,6 @@ function library:init()
 
                 table.insert(self.sections, section);
 
-                --- Create Objects ---
                 do
                     local objs = section.objects;
                     local z = library.zindexOrder.window+15;
@@ -1970,7 +2095,6 @@ function library:init()
                     })
                     
                 end
-                ----------------------
 
                 function section:SetText(text)
                     self.text = tostring(text);
@@ -2005,9 +2129,6 @@ function library:init()
                     end
                 end
 
-                ------- Options -------
-
-                -- // Toggle
                 function section:AddToggle(data)
                     local toggle = {
                         class = 'toggle';
@@ -2037,7 +2158,6 @@ function library:init()
                         library.options[toggle.flag] = toggle;
                     end
 
-                    --- Create Objects ---
                     do
                         local objs = toggle.objects;
                         local z = library.zindexOrder.window+25;
@@ -2104,7 +2224,6 @@ function library:init()
                         end)
 
                     end
-                    ----------------------
 
                     function toggle:SetState(bool, nocallback)
                         if typeof(bool) == 'boolean' then
@@ -2156,7 +2275,6 @@ function library:init()
 
                     end
 
-                    -- // Toggle Addons
                     function toggle:AddColor(data)
                         local color = {
                             class = 'color';
@@ -2186,7 +2304,6 @@ function library:init()
                             library.options[color.flag] = color;
                         end
     
-                        --- Create Objects ---
                         do
                             local objs = color.objects;
                             local z = library.zindexOrder.window+25;
@@ -2242,7 +2359,6 @@ function library:init()
                             end)
     
                         end
-                        ----------------------
 
     
                         function color:SetColor(c3, nocallback)
@@ -2342,11 +2458,10 @@ function library:init()
                             bind.callback(true)
                             local display = bind.state; if bind.invertindicator then display = not bind.state; end
                             bind.indicatorValue:SetEnabled(display and not bind.noindicator);
-                            bind.indicatorValue:SetKey((bind.text == nil or bind.text == '') and (bind.flag == nil and 'unknown' or bind.flag) or bind.text); -- this is so dumb
+                            bind.indicatorValue:SetKey((bind.text == nil or bind.text == '') and (bind.flag == nil and 'unknown' or bind.flag) or bind.text);
                             bind.indicatorValue:SetValue('[Always]');
                         end
     
-                        --- Create Objects ---
                         do
                             local objs = bind.objects;
                             local z = library.zindexOrder.window+25;
@@ -2382,7 +2497,6 @@ function library:init()
                             end)
     
                         end
-                        ----------------------
     
                         local c
                         function bind:SetBind(keybind)
@@ -2418,7 +2532,7 @@ function library:init()
                             end
                             self.keycallback(self.bind);
                             self:SetKeyText(keyName:upper());
-                            self.indicatorValue:SetKey((self.text == nil or self.text == '') and (self.flag == nil and 'unknown' or self.flag) or self.text); -- this is so dumb
+                            self.indicatorValue:SetKey((self.text == nil or self.text == '') and (self.flag == nil and 'unknown' or self.flag) or self.text);
                             self.indicatorValue:SetValue('['..keyName:upper()..']');
                             if self.bind == 'none' then
                                 self.indicatorValue:SetValue('[Always]');
@@ -2524,7 +2638,6 @@ function library:init()
                             library.options[slider.flag] = slider;
                         end
 
-                        --- Create Objects ---
                         do
                             local objs = slider.objects;
                             local z = library.zindexOrder.window+25;
@@ -2637,7 +2750,6 @@ function library:init()
                             end)
     
                         end
-                        ----------------------
     
                         function slider:SetValue(value, nocallback)
                             if typeof(value) == 'number' then
@@ -2702,7 +2814,6 @@ function library:init()
                             library.options[list.flag] = list;
                         end
     
-                        -- Create Objects --
                         do
                             local objs = list.objects;
                             local z = library.zindexOrder.window+25;
@@ -2799,7 +2910,6 @@ function library:init()
     
     
                         end
-                        --------------------
     
                         function list:Select(option, nocallback)
                             option = typeof(option) == 'table' and (self.multi == true and option or (#option == 0 and nil or option[1])) or self.multi == true and {option} or option;
@@ -2863,7 +2973,6 @@ function library:init()
                     return toggle
                 end
 
-                -- // Slider
                 function section:AddSlider(data)
                     local slider = {
                         class = 'slider';
@@ -2898,7 +3007,6 @@ function library:init()
                         library.options[slider.flag] = slider;
                     end
 
-                    --- Create Objects ---
                     do
                         local objs = slider.objects;
                         local z = library.zindexOrder.window+25;
@@ -3062,7 +3170,6 @@ function library:init()
                         end)
 
                     end
-                    ----------------------
 
                     function slider:SetValue(value, nocallback)
                         if typeof(value) == 'number' then
@@ -3105,7 +3212,6 @@ function library:init()
                     return slider
                 end
 
-                -- // Button
                 function section:AddButton(data)
                     local button = {
                         class = 'button';
@@ -3135,7 +3241,6 @@ function library:init()
                         library.options[button.flag] = button;
                     end
 
-                    --- Create Objects ---
                     do
                         local objs = button.objects;
                         local z = library.zindexOrder.window+25;
@@ -3213,7 +3318,7 @@ function library:init()
                             objs.background.ThemeColor = 'Accent';
                             objs.background.ThemeColorOffset = -95;
 
-                            task.spawn(function() -- this is ugly and i do not care :)
+                            task.spawn(function()
                                 if button.confirm then
                                     if clicked then
                                         clicked = false
@@ -3242,7 +3347,6 @@ function library:init()
                         end)
 
                     end
-                    ----------------------
                     function button:AddButton(data)
                         local button = {
                             class = 'button';
@@ -3270,7 +3374,6 @@ function library:init()
                             library.options[button.flag] = button;
                         end
     
-                        --- Create Objects ---
                         do
                             local objs = button.objects;
                             local z = library.zindexOrder.window+25;
@@ -3348,7 +3451,7 @@ function library:init()
                                 objs.background.ThemeColor = 'Accent';
                                 objs.background.ThemeColorOffset = -95;
     
-                                task.spawn(function() -- this is ugly and i do not care :)
+                                task.spawn(function()
                                     if button.confirm then
                                         if clicked then
                                             clicked = false
@@ -3377,7 +3480,6 @@ function library:init()
                             end)
     
                         end
-                        ----------------------
     
                         function button:SetText(str)
                             if typeof(str) == 'string' then
@@ -3391,9 +3493,8 @@ function library:init()
                         self:UpdateOptions();
                         return button
                     end
-                    ----------------------
 
-                    function button:UpdateOptions() -- this so dumb XD
+                    function button:UpdateOptions()
                         local buttons = 1 + #self.subbuttons;
                         local buttonSize = (1 / buttons) - .005;
                         self.objects.background.Size = newUDim2(buttonSize,-4,0,14);
@@ -3416,7 +3517,6 @@ function library:init()
                     return button
                 end
 
-                -- // Separator
                 function section:AddSeparator(data)
                     local separator = {
                         class = 'separator';
@@ -3436,7 +3536,6 @@ function library:init()
         
                     table.insert(self.options, separator)
 
-                    --- Create Objects ---
                     do
                         local objs = separator.objects;
                         local z = library.zindexOrder.window+25;
@@ -3490,7 +3589,6 @@ function library:init()
                         })
 
                     end
-                    ----------------------
 
                     function separator:SetText(str)
                         if typeof(str) == 'string' then
@@ -3509,7 +3607,6 @@ function library:init()
                     return separator
                 end
 
-                -- // Color Picker
                 function section:AddColor(data)
                     local color = {
                         class = 'color';
@@ -3540,7 +3637,6 @@ function library:init()
                         library.options[color.flag] = color;
                     end
 
-                    --- Create Objects ---
                     do
                         local objs = color.objects;
                         local z = library.zindexOrder.window+25;
@@ -3606,7 +3702,6 @@ function library:init()
                         end)
 
                     end
-                    ----------------------
 
                     function color:SetText(str)
                         if typeof(str) == 'string' then
@@ -3671,7 +3766,6 @@ function library:init()
                     return color
                 end
 
-                -- // Text Box
                 function section:AddBox(data)
                     local box = {
                         class = 'box';
@@ -3700,7 +3794,6 @@ function library:init()
                         library.options[box.flag] = box;
                     end
 
-                    --- Create Objects ---
                     do
                         local objs = box.objects;
                         local z = library.zindexOrder.window+25;
@@ -3793,7 +3886,6 @@ function library:init()
                         end)
 
                     end
-                    ----------------------
 
                     function box:SetText(str)
                         if typeof(str) == 'string' then
@@ -3893,7 +3985,6 @@ function library:init()
                     return box
                 end
 
-                -- // Keybind
                 function section:AddBind(data)
                     local bind = {
                         class = 'bind';
@@ -3928,7 +4019,6 @@ function library:init()
                         library.options[bind.flag] = bind;
                     end
 
-                    --- Create Objects ---
                     do
                         local objs = bind.objects;
                         local z = library.zindexOrder.window+25;
@@ -3974,7 +4064,6 @@ function library:init()
                         end)
 
                     end
-                    ----------------------
 
                     local c
 
@@ -4003,7 +4092,7 @@ function library:init()
                         end
                         self.keycallback(self.bind);
                         self:SetKeyText(keyName:upper());
-                        self.indicatorValue:SetKey((self.text == nil or self.text == '') and (self.flag == nil and 'unknown' or self.flag) or self.text); -- this is so dumb
+                        self.indicatorValue:SetKey((self.text == nil or self.text == '') and (self.flag == nil and 'unknown' or self.flag) or self.text);
                         self.indicatorValue:SetValue('['..keyName:upper()..']');
                         self.objects.keyText.ThemeColor = self.objects.holder.Hover and 'Accent' or 'Option Text 3';
                     end
@@ -4066,7 +4155,6 @@ function library:init()
                     return bind
                 end
 
-                -- // Dropdown
                 function section:AddList(data)
                     local list = {
                         class = 'list';
@@ -4098,7 +4186,6 @@ function library:init()
                         library.options[list.flag] = list;
                     end
 
-                    -- Create Objects --
                     do
                         local objs = list.objects;
                         local z = library.zindexOrder.window+25;
@@ -4205,7 +4292,6 @@ function library:init()
 
 
                     end
-                    --------------------
 
                     function list:SetText(str)
                         if typeof(str) == 'string' then
@@ -4270,7 +4356,6 @@ function library:init()
                     return list
                 end
 
-                -- Text
                 function section:AddText(data)
                     local text = {
                         class = 'text';
@@ -4296,7 +4381,6 @@ function library:init()
 
                     table.insert(self.options, text)
 
-                    --- Create Objects ---
                     do
                         local objs = text.objects;
                         local z = library.zindexOrder.window+25;
@@ -4317,7 +4401,6 @@ function library:init()
                             Parent = objs.holder;
                         })
                     end
-                    ----------------------
 
                     function text:SetText(str)
                         if typeof(str) == 'string' then
@@ -4332,8 +4415,6 @@ function library:init()
                     self:UpdateOptions();
                     return text
                 end
-
-                -----------------------
 
                 section:UpdateOptions();
                 section:SetText(section.text);
@@ -4429,7 +4510,6 @@ function library:init()
         return window;
     end
 
-    -- Tooltip
     do
         local z = library.zindexOrder.window + 2000;
         tooltipObjects.background = utility:Draw('Square', {
@@ -4477,7 +4557,6 @@ function library:init()
 
     end
     
-    -- Watermark
     do
         self.watermark = {
             objects = {};
@@ -4602,35 +4681,41 @@ function library:init()
     self:SetTheme(library.theme);
     self:SetOpen(true);
     self.hasInit = true
+    
+    local autoloadTheme = self:GetAutoloadTheme()
+    if autoloadTheme then
+        self:LoadTheme(autoloadTheme)
+    end
+    
+    local autoloadConfig = self:GetAutoloadConfig()
+    if autoloadConfig then
+        task.wait(0.5)
+        self:LoadConfig(autoloadConfig)
+    end
 
 end
 
 function library:CreateSettingsTab(menu)
     local settingsTab = menu:AddTab('Settings', 999);
     local configSection = settingsTab:AddSection('Config', 2);
+    local themeSection = settingsTab:AddSection('Theme', 2);
     local mainSection = settingsTab:AddSection('Main', 1);
+    local themeCustomSection = settingsTab:AddSection('Theme Editor', 1);
     local creditsSection = settingsTab:AddSection('Credits', 2);
+    
     creditsSection:AddSeparator({text = 'Owners/Developers'});
-    creditsSection:AddText({text = "xz#1111"})
-    creditsSection:AddText({text = "goof#1000"})
-    creditsSection:AddSeparator({text = 'Helpers'});
-    creditsSection:AddText({text = "encode#9999"})
-    creditsSection:AddText({text = "Vault#5434"})
-
-
+    creditsSection:AddText({text = "zikiouh"})
     configSection:AddBox({text = 'Config Name', flag = 'configinput'})
     configSection:AddList({text = 'Config', flag = 'selectedconfig'})
 
     local function refreshConfigs()
         library.options.selectedconfig:ClearValues();
-        for _,v in next, listfiles(self.cheatname..'/'..self.gamename..'/configs') do
-            local ext = '.'..v:split('.')[#v:split('.')];
-            if ext == self.fileext then
-                library.options.selectedconfig:AddValue(v:split('\\')[#v:split('\\')]:sub(1,-#ext-1))
-            end
+        for name in next, library:GetAllConfigs() do
+            library.options.selectedconfig:AddValue(name)
         end
     end
 
+    local autoloadCheckbox
     configSection:AddButton({text = 'Load', confirm = false, callback = function()
         library:LoadConfig(library.flags.selectedconfig);
     end}):AddButton({text = 'Save', confirm = true, callback = function()
@@ -4644,16 +4729,103 @@ function library:CreateSettingsTab(menu)
         if library:GetConfig(library.flags.configinput) then
             return
         end
-        writefile(self.cheatname..'/'..self.gamename..'/configs/'..library.flags.configinput.. self.fileext, http:JSONEncode({}));
+        writefile(library.cheatname..'/'..library.gamename..'/configs/'..library.flags.configinput.. library.fileext, http:JSONEncode({_autoload = false, _theme = library.flags.current_theme or "Default"}));
         refreshConfigs()
     end}):AddButton({text = 'Delete', confirm = true, callback = function()
         if library:GetConfig(library.flags.selectedconfig) then
-            delfile(self.cheatname..'/'..self.gamename..'/configs/'..library.flags.selectedconfig.. self.fileext);
+            delfile(library.cheatname..'/'..library.gamename..'/configs/'..library.flags.selectedconfig.. library.fileext);
             refreshConfigs()
         end
     end})
+    
+    autoloadCheckbox = configSection:AddToggle({
+        text = 'Set as Autoload',
+        flag = 'config_autoload',
+        callback = function(bool)
+            if bool and library.flags.selectedconfig then
+                library:SetAutoloadConfig(library.flags.selectedconfig)
+                library:SendNotification("Set " .. library.flags.selectedconfig .. " as autoload config", 3)
+            end
+        end
+    })
 
     refreshConfigs()
+
+    themeSection:AddBox({text = 'Theme Name', flag = 'themeinput'})
+    
+    local themeList = themeSection:AddList({text = 'Theme', flag = 'selectedtheme', callback = function(themeName)
+        library:LoadTheme(themeName)
+        library.flags.current_theme = themeName
+    end})
+    
+    local function refreshThemes()
+        themeList:ClearValues()
+        for themeName in next, library:GetAllThemes() do
+            themeList:AddValue(themeName)
+        end
+    end
+    
+    refreshThemes()
+    themeList:Select('Default')
+    
+    themeSection:AddButton({text = 'Save Current', callback = function()
+        if library.flags.themeinput == "" then 
+            library:SendNotification("Please enter a theme name", 3)
+            return
+        end
+        library:SaveTheme(library.flags.themeinput)
+        refreshThemes()
+        library:SendNotification("Saved theme: " .. library.flags.themeinput, 3)
+    end}):AddButton({text = 'Delete', confirm = true, callback = function()
+        if library.flags.selectedtheme then
+            library:DeleteTheme(library.flags.selectedtheme)
+            refreshThemes()
+            library:SendNotification("Deleted theme: " .. library.flags.selectedtheme, 3)
+        end
+    end})
+    
+    themeSection:AddButton({text = 'Export', callback = function()
+        if library.flags.selectedtheme then
+            library:ExportTheme(library.flags.selectedtheme)
+            library:SendNotification("Copied theme to clipboard", 3)
+        end
+    end}):AddButton({text = 'Import', callback = function()
+        if library.flags.themeinput == "" then 
+            library:SendNotification("Please enter a theme name", 3)
+            return
+        end
+        local success = library:ImportTheme(library.flags.themeinput, getclipboard())
+        if success then
+            refreshThemes()
+            library:SendNotification("Imported theme: " .. library.flags.themeinput, 3)
+        else
+            library:SendNotification("Failed to import theme", 3)
+        end
+    end})
+    
+    themeSection:AddToggle({
+        text = 'Set as Autoload',
+        flag = 'theme_autoload',
+        callback = function(bool)
+            if bool and library.flags.selectedtheme then
+                library:SetAutoloadTheme(library.flags.selectedtheme)
+                library:SendNotification("Set " .. library.flags.selectedtheme .. " as autoload theme", 3)
+            end
+        end
+    })
+    
+    themeCustomSection:AddSeparator({text = 'Edit Theme Colors'})
+    
+    for colorName, colorValue in next, library.theme do
+        themeCustomSection:AddColor({
+            text = colorName,
+            color = colorValue,
+            callback = function(color)
+                library.theme[colorName] = color
+                library.UpdateThemeColors()
+            end
+        })
+    end
 
     mainSection:AddBind({text = 'Open / Close', flag = 'togglebind', nomouse = true, noindicator = true, bind = Enum.KeyCode.RightShift, callback = function()
         library:SetOpen(not library.open)
@@ -4724,29 +4896,6 @@ function library:CreateSettingsTab(menu)
     end})
     mainSection:AddSlider({text = 'Custom X', flag = 'watermark_x', suffix = '%', value = 6.1, min = 0, max = 100, increment = .1});
     mainSection:AddSlider({text = 'Custom Y', flag = 'watermark_y', suffix = '%', value = 1.2, min = 0, max = 100, increment = .1});
-
-    local themeStrings = {};
-    for _,v in next, library.themes do
-        table.insert(themeStrings, v.name)
-    end
-    local themeSection = settingsTab:AddSection('Theme', 1);
-    local setByPreset = false
-
-    themeSection:AddList({text = 'Presets', flag = 'preset_theme', values = themeStrings, callback = function(newTheme)
-        setByPreset = true
-        for _,v in next, library.themes do
-            if v.name == newTheme then
-                for x, d in pairs(library.options) do
-                    if v.theme[tostring(x)] ~= nil then
-                        d:SetColor(v.theme[tostring(x)])
-                    end
-                end
-                library:SetTheme(v.theme)
-                break
-            end
-        end
-        setByPreset = false
-    end}):Select('Default');
 
     return settingsTab;
 end
