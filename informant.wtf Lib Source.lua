@@ -4697,11 +4697,12 @@ end
 
 function library:CreateSettingsTab(menu)
     local settingsTab = menu:AddTab('Settings', 999);
-    local settingsTab2 = menu:AddTab('Settings Extended', 999);
+    local settingsExtendedTab = menu:AddTab('Settings Extended', 1000);
     local configSection = settingsTab:AddSection('Config', 2);
     local themeSection = settingsTab:AddSection('Theme', 2);
     local mainSection = settingsTab:AddSection('Main', 1);
-    local themeCustomSection = settingsTab2:AddSection('Theme Editor', 1);
+    local themeCustomSection = settingsExtendedTab:AddSection('Theme Editor', 1);
+    local themeCustomSection2 = settingsExtendedTab:AddSection('Theme Colors', 2);
     local creditsSection = settingsTab:AddSection('Credits', 2);
     
     creditsSection:AddSeparator({text = 'Owners/Developers'});
@@ -4816,17 +4817,31 @@ function library:CreateSettingsTab(menu)
         end
     })
     
-    themeCustomSection:AddSeparator({text = 'Edit Theme Colors'})
+    themeCustomSection:AddSeparator({text = 'Theme Color Editor'})
+    themeCustomSection:AddText({text = 'Edit individual theme colors below'})
+    themeCustomSection:AddText({text = 'Changes apply in real-time'})
+    themeCustomSection:AddSeparator({text = 'UI Colors'})
     
+    local sortedColors = {}
     for colorName, colorValue in next, library.theme do
-        themeCustomSection:AddColor({
-            text = colorName,
-            color = colorValue,
+        table.insert(sortedColors, {name = colorName, value = colorValue})
+    end
+    table.sort(sortedColors, function(a, b) return a.name < b.name end)
+    
+    local colorIndex = 0
+    for _, colorData in next, sortedColors do
+        local targetSection = (colorIndex % 2 == 0) and themeCustomSection or themeCustomSection2
+        
+        targetSection:AddColor({
+            text = colorData.name,
+            color = colorData.value,
             callback = function(color)
-                library.theme[colorName] = color
+                library.theme[colorData.name] = color
                 library.UpdateThemeColors()
             end
         })
+        
+        colorIndex = colorIndex + 1
     end
 
     mainSection:AddBind({text = 'Open / Close', flag = 'togglebind', nomouse = true, noindicator = true, bind = Enum.KeyCode.RightShift, callback = function()
@@ -4904,3 +4919,4 @@ end
 
 getgenv().library = library
 return library
+
