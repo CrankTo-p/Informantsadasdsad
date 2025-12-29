@@ -1,7 +1,36 @@
 local startupArgs = ({...})[1] or {}
+local Signal = {}
+Signal.__index = Signal
 
+function Signal.new()
+    local self = setmetatable({}, Signal)
+    self.connections = {}
+    return self
+end
+
+function Signal:Connect(callback)
+    table.insert(self.connections, callback)
+    return {
+        Disconnect = function()
+            for i, conn in ipairs(self.connections) do
+                if conn == callback then
+                    table.remove(self.connections, i)
+                    break
+                end
+            end
+        end
+    }
+end
+
+function Signal:Fire(...)
+    for _, callback in ipairs(self.connections) do
+        callback(...)
+    end
+end
+
+library.signal = Signal
 if getgenv().library ~= nil then
-    getgenv().library:Unload();
+    --getgenv().library:Unload();
 end
 
 if not game:IsLoaded() then
@@ -233,11 +262,6 @@ local keyNames = {
     [Enum.UserInputType.MouseButton2] = 'MB2';
     [Enum.UserInputType.MouseButton3] = 'MB3';
 }
-
-library.button1down = library.signal.new()
-library.button1up   = library.signal.new()
-library.mousemove   = library.signal.new()
-library.unloaded    = library.signal.new();
 
 local button1down, button1up, mousemove = library.button1down, library.button1up, library.mousemove
 local mb1down = false;
@@ -491,7 +515,6 @@ do
             for i,v in next, self.Children do
                 v:Remove();
             end
-
             if drawing.Parent then
                 drawing.Parent.Children[drawing.Object] = nil;
             end
@@ -4916,3 +4939,4 @@ end
 
 getgenv().library = library
 return library
+
