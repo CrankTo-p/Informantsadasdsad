@@ -1,36 +1,7 @@
 local startupArgs = ({...})[1] or {}
-local Signal = {}
-Signal.__index = Signal
 
-function Signal.new()
-    local self = setmetatable({}, Signal)
-    self.connections = {}
-    return self
-end
-
-function Signal:Connect(callback)
-    table.insert(self.connections, callback)
-    return {
-        Disconnect = function()
-            for i, conn in ipairs(self.connections) do
-                if conn == callback then
-                    table.remove(self.connections, i)
-                    break
-                end
-            end
-        end
-    }
-end
-
-function Signal:Fire(...)
-    for _, callback in ipairs(self.connections) do
-        callback(...)
-    end
-end
-
-library.signal = Signal
 if getgenv().library ~= nil then
-    --getgenv().library:Unload();
+    getgenv().library:Unload();
 end
 
 if not game:IsLoaded() then
@@ -86,7 +57,45 @@ local library = {
         ['colortrans'] = 'https://raw.githubusercontent.com/portallol/luna/main/modules/trans.png';
     };
     numberStrings = {['Zero'] = 0, ['One'] = 1, ['Two'] = 2, ['Three'] = 3, ['Four'] = 4, ['Five'] = 5, ['Six'] = 6, ['Seven'] = 7, ['Eight'] = 8, ['Nine'] = 9};
-    signal = loadstring(game:HttpGet('https://raw.githubusercontent.com/drillygzzly/Other/main/1414'))();
+    signal = (function()
+    local Signal = {}
+    Signal.__index = Signal
+
+    function Signal.new()
+        local self = setmetatable({}, Signal)
+        self.connections = {}
+        return self
+    end
+
+    function Signal:Connect(func)
+        local connection = {
+            connected = true,
+            func = func
+        }
+        
+        function connection:Disconnect()
+            self.connected = false
+        end
+        
+        table.insert(self.connections, connection)
+        return connection
+    end
+
+    function Signal:Fire(...)
+        for i = #self.connections, 1, -1 do
+            if not self.connections[i].connected then
+                table.remove(self.connections, i)
+            end
+        end
+        for _, connection in ipairs(self.connections) do
+            if connection.connected then
+                task.spawn(connection.func, ...)
+            end
+        end
+    end
+
+    return Signal
+end)();
     open = false;
     opening = false;
     hasInit = false;
@@ -262,6 +271,11 @@ local keyNames = {
     [Enum.UserInputType.MouseButton2] = 'MB2';
     [Enum.UserInputType.MouseButton3] = 'MB3';
 }
+
+library.button1down = library.signal.new()
+library.button1up   = library.signal.new()
+library.mousemove   = library.signal.new()
+library.unloaded    = library.signal.new();
 
 local button1down, button1up, mousemove = library.button1down, library.button1up, library.mousemove
 local mb1down = false;
@@ -515,6 +529,7 @@ do
             for i,v in next, self.Children do
                 v:Remove();
             end
+
             if drawing.Parent then
                 drawing.Parent.Children[drawing.Object] = nil;
             end
@@ -4939,4 +4954,5 @@ end
 
 getgenv().library = library
 return library
+
 
