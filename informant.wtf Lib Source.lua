@@ -391,14 +391,16 @@ do
         return proxy
     end
 
-    function utility:MouseOver(obj)
-        local mousePos = inputservice:GetMouseLocation();
-        local x1 = obj.Position.X
-        local y1 = obj.Position.Y
-        local x2 = x1 + obj.Size.X
-        local y2 = y1 + obj.Size.Y
-        return (mousePos.X >= x1 and mousePos.Y >= y1 and mousePos.X <= x2 and mousePos.Y <= y2)
-    end
+function utility:MouseOver(obj)
+    local mousePos = inputservice:GetMouseLocation()
+    local pos = obj.Position
+    local size = obj.Size
+    local x1 = typeof(pos) == 'Vector2' and pos.X or pos.X.Offset
+    local y1 = typeof(pos) == 'Vector2' and pos.Y or pos.Y.Offset
+    local x2 = x1 + (typeof(size) == 'Vector2' and size.X or size.X.Offset)
+    local y2 = y1 + (typeof(size) == 'Vector2' and size.Y or size.Y.Offset)
+    return (mousePos.X >= x1 and mousePos.Y >= y1 and mousePos.X <= x2 and mousePos.Y <= y2)
+end
 
     function utility:GetHoverObject()
         local objects = {}
@@ -2557,7 +2559,7 @@ function self:GetAllThemes()
                                 local display = bind.state; if bind.invertindicator then display = not bind.state; end
                                 bind.indicatorValue:SetEnabled(display and not bind.noindicator);
                             else
-                                keyName = keyNames[keybind] or keybind.Name or keybind
+                                keyName = keybind and (keyNames[keybind] or (typeof(keybind) ~= 'string' and keybind.Name) or tostring(keybind)) or 'NONE'
                             end
                             if self.bind ~= 'none' then
                                 bind.state = false
@@ -4126,7 +4128,7 @@ function self:GetAllThemes()
                         if self.bind == Enum.KeyCode.Backspace then
                             self.bind = 'none';
                         else
-                            keyName = keyNames[keybind] or keybind.Name or keybind
+                            keyName = keybind and (keyNames[keybind] or (typeof(keybind) ~= 'string' and keybind.Name) or tostring(keybind)) or 'NONE'
                         end
                         self.keycallback(self.bind);
                         self:SetKeyText(keyName:upper());
