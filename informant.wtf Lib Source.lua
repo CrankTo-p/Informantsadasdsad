@@ -392,28 +392,33 @@ do
     end
 
 function utility:MouseOver(obj)
-    local mousePos = inputservice:GetMouseLocation()
-    local pos = obj.Position
-    local size = obj.Size
-    local x1 = typeof(pos) == 'Vector2' and pos.X or pos.X.Offset
-    local y1 = typeof(pos) == 'Vector2' and pos.Y or pos.Y.Offset
-    local x2 = x1 + (typeof(size) == 'Vector2' and size.X or size.X.Offset)
-    local y2 = y1 + (typeof(size) == 'Vector2' and size.Y or size.Y.Offset)
-    return (mousePos.X >= x1 and mousePos.Y >= y1 and mousePos.X <= x2 and mousePos.Y <= y2)
+    local ok, result = pcall(function()
+        local mousePos = inputservice:GetMouseLocation()
+        local pos, size = obj.Position, obj.Size
+        local x1 = typeof(pos) == 'Vector2' and pos.X or (typeof(pos) == 'UDim2' and pos.X.Offset or 0)
+        local y1 = typeof(pos) == 'Vector2' and pos.Y or (typeof(pos) == 'UDim2' and pos.Y.Offset or 0)
+        local x2 = x1 + (typeof(size) == 'Vector2' and size.X or (typeof(size) == 'UDim2' and size.X.Offset or 0))
+        local y2 = y1 + (typeof(size) == 'Vector2' and size.Y or (typeof(size) == 'UDim2' and size.Y.Offset or 0))
+        return (mousePos.X >= x1 and mousePos.Y >= y1 and mousePos.X <= x2 and mousePos.Y <= y2)
+    end)
+    return ok and result or false
 end
 
-    function utility:GetHoverObject()
+function utility:GetHoverObject()
+    local ok, result = pcall(function()
         local objects = {}
         for i,v in next, library.drawings do
-            if v.Object.Visible and v.Class == 'Square' and self:MouseOver(v.Object) then
-                table.insert(objects,v.Object)
+            if v and v.Object and v.Object.Visible and v.Class == 'Square' and self:MouseOver(v.Object) then
+                table.insert(objects, v.Object)
             end
         end
-        table.sort(objects,function(a,b)
+        table.sort(objects, function(a,b)
             return a.ZIndex > b.ZIndex
         end)
         return objects[1]
-    end
+    end)
+    return ok and result or nil
+end
 
     function utility:Draw(class, properties)
         local blacklistedProperties = {'Object','Children','Class'}
@@ -2559,7 +2564,7 @@ function self:GetAllThemes()
                                 local display = bind.state; if bind.invertindicator then display = not bind.state; end
                                 bind.indicatorValue:SetEnabled(display and not bind.noindicator);
                             else
-                                keyName = keybind and (keyNames[keybind] or (typeof(keybind) ~= 'string' and keybind.Name) or tostring(keybind)) or 'NONE'
+                                keyName = (keybind and (keyNames[keybind] or (pcall(function() return keybind.Name end) and keybind.Name) or tostring(keybind))) or 'NONE'
                             end
                             if self.bind ~= 'none' then
                                 bind.state = false
@@ -4128,7 +4133,7 @@ function self:GetAllThemes()
                         if self.bind == Enum.KeyCode.Backspace then
                             self.bind = 'none';
                         else
-                            keyName = keybind and (keyNames[keybind] or (typeof(keybind) ~= 'string' and keybind.Name) or tostring(keybind)) or 'NONE'
+                            keyName = (keybind and (keyNames[keybind] or (pcall(function() return keybind.Name end) and keybind.Name) or tostring(keybind))) or 'NONE'
                         end
                         self.keycallback(self.bind);
                         self:SetKeyText(keyName:upper());
